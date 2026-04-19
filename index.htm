@@ -86,64 +86,65 @@
     let baselineSnapshot = {}; // 儲存每筆任務的原始基準日期，永遠不改動
     let dateFormatSnapshot = {}; // 儲存每筆任務的原始日期格式（西元年/民國年）
     let originalDateFormatMap = {}; // ★ 新增：映射 task → 原始西元年/民國年日期字串（第一次解析時鎖定）
-  window.onload = () => {
-    // 1. Force clear the 'waiting' state immediately
-    const empty = document.getElementById('emptyState');
-    const results = document.getElementById('results');
-    
+ window.onload = () => {
+    // Stop any "loading" states immediately
+    const stopLoading = () => {
+        const empty = document.getElementById('emptyState');
+        const results = document.getElementById('results');
+        if (currentData.length === 0) {
+            if (empty) empty.style.display = 'block';
+            if (results) results.innerHTML = '';
+        }
+    };
+
     try {
-        // 2. Load the data
         const savedData = loadFromLocalStorage();
-        
         if (savedData && savedData.length > 0) {
             currentData = savedData;
             currentData.sort((a, b) => a.date - b.date);
             renderResults(currentData, defaultConfig);
-            if (empty) empty.style.display = 'none';
-        } else {
-            // If no data, show the empty state so it's not "stuck"
-            if (empty) empty.style.display = 'block';
-            if (results) results.innerHTML = '';
         }
     } catch (e) {
-        console.error("Initialization error:", e);
-        // Fallback: show empty state if code crashes
-        if (empty) empty.style.display = 'block';
+        console.error("Load error:", e);
+    } finally {
+        stopLoading();
+        // Set today's date
+        const today = new Date();
+        const todayText = formatDateString(today.getFullYear(), today.getMonth() + 1, today.getDate(), false);
+        const todayDisp = document.getElementById('todayDisplay');
+        if (todayDisp) todayDisp.textContent = "今日：" + todayText;
+        
+        if (window.lucide) lucide.createIcons();
     }
-
-    // 3. Update Today's Display
-    const today = new Date();
-    const todayText = formatDateString(today.getFullYear(), today.getMonth() + 1, today.getDate(), false);
-    const todayDisp = document.getElementById('todayDisplay');
-    if (todayDisp) todayDisp.textContent = "今日：" + todayText;
-
-    // 4. Icons
-    if (window.lucide) lucide.createIcons();
 };
     
   async function importFromCloud() {
-    const gistRawUrl = 'https://gist.githubusercontent.com/kulo2026/6eb3376bcf2fe8f601ab1e59ffd42074/raw/4f3744f0987add6040fb53c4c288d3e62f2f9a5e/todo.json';
-    
-    // Change button text to show it is working
     const btn = document.getElementById('cloudSyncBtn');
+    if (!btn) return;
+
+    // Prevent multiple clicks
+    if (btn.disabled) return;
+    
     const originalText = btn.innerHTML;
-    btn.innerHTML = '<span>🔄 同步中...</span>';
+    btn.innerHTML = '🔄 同步中...';
     btn.disabled = true;
 
+    // Safety Timeout: If it takes more than 10 seconds, stop trying
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+
     try {
-        // The Cache Buster we discussed
-        const response = await fetch(gistRawUrl + '?t=' + Date.now());
-        
+        const gistRawUrl = 'https://githubusercontent.com';
+        const finalUrl = 'https://allorigins.win' + encodeURIComponent(gistRawUrl + '?t=' + Date.now());
+
+        const response = await fetch(finalUrl, { signal: controller.signal });
+        clearTimeout(timeoutId);
+
         if (!response.ok) throw new Error('HTTP ' + response.status);
-        
         const data = await response.json();
         
         if (data && data.items) {
-            // Restore snapshots
             baselineSnapshot = data.baselineSnapshot || {};
-            dateFormatSnapshot = data.dateFormatSnapshot || {};
-            
-            // Clean and rebuild the data
             currentData = data.items.map(item => ({
                 ...item,
                 date: new Date(item.date)
@@ -151,22 +152,16 @@
 
             saveToLocalStorage();
             renderResults(currentData, defaultConfig);
-            
-            // Success feedback
-            btn.innerHTML = '<span>✅ 同步完成</span>';
-            setTimeout(() => {
-                btn.innerHTML = originalText;
-                btn.disabled = false;
-            }, 2000);
-
-        } else {
-            throw new Error('資料格式不正確');
+            alert('✅ 雲端同步完成！');
         }
     } catch (err) {
         console.error('Sync Error:', err);
-        alert('❌ 同步失敗：' + err.message);
+        alert(err.name === 'AbortError' ? '❌ 同步逾時 (請檢查網路)' : '❌ 同步失敗');
+    } finally {
+        // ALWAYS reset the button state so it stops "running"
         btn.innerHTML = originalText;
         btn.disabled = false;
+        if (window.lucide) lucide.createIcons();
     }
 }
     // 函數import匯入檔案函數 - 直接點擊隱藏的檔案輸入框
