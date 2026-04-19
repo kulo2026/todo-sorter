@@ -1,160 +1,34 @@
 <!doctype html>
-<html lang="zh-Hant">
+<html>
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>日期待辦排序器</title>
-    <script src="https://tailwindcss.com"></script>
-    <script src="https://jsdelivr.net"></script>
-    <link href="https://googleapis.com" rel="stylesheet">
+    <title>Test Page</title>
     <style>
-        body { font-family: 'Noto Sans TC', sans-serif; background: #0f1117; color: #e8eaed; }
-        .item-card { background: #181a22; border: 1px solid #2a2d37; transition: all 0.2s; }
-        .item-card:hover { border-color: #63d297; }
+        body { background: #0f1117; color: white; font-family: sans-serif; text-align: center; padding-top: 50px; }
+        #status { color: #63d297; font-size: 24px; margin-bottom: 20px; }
+        button { padding: 10px 20px; cursor: pointer; }
     </style>
 </head>
-<body class="p-4 sm:p-8">
-    <div class="max-w-2xl mx-auto">
-        <!-- Header -->
-        <div class="text-center mb-8">
-            <h1 class="text-3xl font-bold mb-2">日期待辦排序器</h1>
-            <div id="todayDisplay" class="text-green-400 font-mono">載入中...</div>
-        </div>
-
-        <!-- Controls -->
-        <div class="bg-[#181a22] p-4 rounded-xl border border-[#2a2d37] mb-6">
-            <textarea id="dataInput" rows="3" class="w-full bg-[#0f1117] border border-[#2a2d37] rounded-lg p-3 text-sm mb-3" placeholder="貼上資料..."></textarea>
-            <div class="flex flex-wrap gap-2 justify-between">
-                <button onclick="parseData()" class="bg-[#63d297] text-[#0f1117] px-4 py-2 rounded-lg font-bold text-sm">排序顯示</button>
-                <div class="flex gap-2">
-                    <button id="cloudSyncBtn" onclick="importFromCloud()" class="bg-slate-800 px-3 py-2 rounded-lg text-xs">同步雲端</button>
-                    <button onclick="clearStorage()" class="bg-red-900/30 text-red-400 px-3 py-2 rounded-lg text-xs">清除</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Results -->
-        <div id="results" class="space-y-3"></div>
-        
-        <!-- Empty State -->
-        <div id="emptyState" class="text-center py-20 text-slate-600">
-            <p>目前沒有待辦事項</p>
-        </div>
-    </div>
+<body>
+    <div id="status">程式載入中...</div>
+    <div id="today"></div>
+    <br>
+    <button onclick="testFunction()">點擊測試按鈕</button>
 
     <script>
-        let currentData = [];
+        // 1. Check if script runs at all
+        document.getElementById('status').textContent = "✅ 程式已成功啟動";
 
-        // 1. 啟動
-        window.onload = function() {
-            const today = new Date();
-            document.getElementById('todayDisplay').textContent = "今日：" + (today.getFullYear() - 1911) + "年" + (today.getMonth() + 1) + "月" + today.getDate() + "日";
-            
-            const stored = localStorage.getItem('todoData');
-            if (stored) {
-                try {
-                    currentData = JSON.parse(stored);
-                    renderResults();
-                } catch (e) { console.error("Data error"); }
-            }
-            if (window.lucide) lucide.createIcons();
-        };
+        // 2. Show Date
+        const now = new Date();
+        document.getElementById('today').textContent = "今日日期：" + now.toLocaleDateString();
 
-        // 2. 解析資料
-        function parseData() {
-            const input = document.getElementById('dataInput');
-            const lines = input.value.split('\n');
-            lines.forEach(line => {
-                const m = line.match(/^(\d{3,4})(\d{2})(\d{2})\s*(.*)$/);
-                if (m) {
-                    currentData.push({
-                        date: m[1] + "-" + m[2] + "-" + m[3],
-                        task: m[4] || "未命名任務"
-                    });
-                }
-            });
-            input.value = '';
-            saveAndRender();
+        // 3. Test Button
+        function testFunction() {
+            alert("按鈕運作正常！");
         }
-
-        // 3. 雲端同步
-        async function importFromCloud() {
-            const btn = document.getElementById('cloudSyncBtn');
-            btn.textContent = '同步中...';
-            const gistUrl = 'https://gist.githubusercontent.com/kulo2026/6eb3376bcf2fe8f601ab1e59ffd42074/raw/4f3744f0987add6040fb53c4c288d3e62f2f9a5e/todo.json';
-            const finalUrl = 'https://allorigins.win' + encodeURIComponent(gistUrl + '?t=' + Date.now());
-
-            try {
-                const resp = await fetch(finalUrl);
-                const data = await resp.json();
-                if (data.items) {
-                    currentData = data.items;
-                    saveAndRender();
-                    alert('✅ 同步完成');
-                }
-            } catch (e) { alert('❌ 同步失敗'); }
-            finally { btn.textContent = '同步雲端'; }
-        }
-
-        // 4. 渲染畫面
-        function renderResults() {
-            const container = document.getElementById('results');
-            const empty = document.getElementById('emptyState');
-            
-            if (currentData.length === 0) {
-                container.innerHTML = '';
-                empty.style.display = 'block';
-                return;
-            }
-            
-            empty.style.display = 'none';
-            currentData.sort((a, b) => a.date.localeCompare(b.date));
-
-            let html = '';
-            currentData.forEach((item, index) => {
-                html += `
-                <div class="item-card p-4 rounded-xl flex justify-between items-center">
-                    <div>
-                        <div class="text-xs text-green-400 font-mono mb-1">${item.date}</div>
-                        <div class="text-sm">${item.task}</div>
-                    </div>
-                    <div class="flex gap-2">
-                        <button onclick="editItem(${index})" class="text-slate-400 p-1"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
-                        <button onclick="deleteItem(${index})" class="text-red-400 p-1"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
-                    </div>
-                </div>`;
-            });
-            container.innerHTML = html;
-            if (window.lucide) lucide.createIcons();
-        }
-
-        // 5. 功能按鈕
-        function saveAndRender() {
-            localStorage.setItem('todoData', JSON.stringify(currentData));
-            renderResults();
-        }
-
-        function deleteItem(index) {
-            if (confirm('確定刪除？')) {
-                currentData.splice(index, 1);
-                saveAndRender();
-            }
-        }
-
-        function editItem(index) {
-            const newTask = prompt('編輯任務內容：', currentData[index].task);
-            if (newTask) {
-                currentData[index].task = newTask;
-                saveAndRender();
-            }
-        }
-
-        function clearStorage() {
-            if (confirm('確定清除所有資料？')) {
-                localStorage.clear();
-                location.reload();
-            }
-        }
+        
+        console.log("Script execution finished.");
     </script>
 </body>
 </html>
