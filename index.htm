@@ -70,63 +70,65 @@
         // --- 核心同步邏輯 (The working Proxy Version) ---
         async function importFromCloud() {
     const btn = document.getElementById('cloudSyncBtn');
+    const gistUrl = 'https://githubusercontent.com';
     
-    // 1. Direct RAW link (GitHub Pages trusts GitHub Gist)
-    const gistUrl = 'https://gist.githubusercontent.com/kulo2026/6eb3376bcf2fe8f601ab1e59ffd42074/raw/4f3744f0987add6040fb53c4c288d3e62f2f9a5e/todo.json';
-
-    btn.textContent = "⌛ 同步中...";
-    
+    btn.textContent = "⌛ 下載中...";
     try {
-        // 2. Fetch directly with a timestamp to prevent old data
         const response = await fetch(gistUrl + '?t=' + Date.now());
-        
-        if (!response.ok) throw new Error('無法存取 Gist (Status: ' + response.status + ')');
-        
         const data = await response.json();
         
-        if (data && data.items) {
-            // 3. Process and convert dates
-            currentData = data.items.map(i => ({
-                ...i, 
-                date: new Date(i.date)
-            }));
-            
-            saveLocal();
+        if (data.items) {
+            currentData = data.items.map(i => ({...i, date: new Date(i.date)}));
+            saveLocal(); // Automatically update browser memory too
             render();
-            alert("✅ 雲端同步完成");
+            alert("✅ 雲端資料下載成功！");
         }
     } catch (e) { 
-        console.error("Sync Error:", e);
-        alert("❌ 同步失敗：連線被拒絕。請確認 Gist 是否為公開(Public)或 Secret，且連結正確。"); 
+        alert("❌ 下載失敗，請檢查網路。"); 
     } finally { 
-        btn.textContent = "🔄 同步雲端"; 
+        btn.textContent = "☁️ 雲端下載"; 
     }
 }
- function saveLocal() {
-    const dataToSave = {
+
+// --- 2. 儲存本地 (Saves only to Browser Memory) ---
+function manualSaveLocal() {
+    try {
+        saveLocal(); // Calls your existing internal save logic
+        alert("💾 已儲存至瀏覽器暫存！(重啟瀏覽器資料仍會在)");
+    } catch (e) {
+        alert("❌ 儲存失敗");
+    }
+}
+
+// --- 3. 本地下載 (Saves to your computer as .json) ---
+function downloadJSON() {
+    if (currentData.length === 0) {
+        alert("目前沒有資料可以下載");
+        return;
+    }
+
+    // Prepare data in the format your GitHub Gist expects
+    const exportObj = {
         items: currentData.map(item => ({
             task: item.task,
-            // Convert Date object to string format YYYY-MM-DD
             date: item.date instanceof Date ? item.date.toISOString().split('T')[0] : item.date
         }))
     };
-    localStorage.setItem('todoData', JSON.stringify(dataToSave));
-}
 
-function loadLocal() {
-    const s = localStorage.getItem('todoData');
-    if (s) {
-        const parsed = JSON.parse(s);
-        // Handle both simple list or {items: []} format
-        const list = Array.isArray(parsed) ? parsed : (parsed.items || []);
-        currentData = list.map(i => ({
-            ...i,
-            date: new Date(i.date)
-        }));
-        render();
-    }
-} 
-        
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportObj, null, 2));
+    const downloadAnchorNode = document.createElement('a');
+    downloadAnchorNode.setAttribute("href", dataStr);
+    
+    const now = new Date();
+    const dateStr = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}`;
+    downloadAnchorNode.setAttribute("download", `todo_backup_${dateStr}.json`);
+    
+    document.body.appendChild(downloadAnchorNode);
+    downloadAnchorNode.click();
+    downloadAnchorNode.remove();
+    
+    alert("📥 已生成 JSON 檔案，請記得上傳至 GitHub 以更新雲端。");
+}
         
         
         // --- 排序與解析 ---
