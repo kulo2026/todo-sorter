@@ -59,26 +59,33 @@
 
         // --- 核心同步邏輯 (The working Proxy Version) ---
         async function importFromCloud() {
-            const btn = document.getElementById('cloudSyncBtn');
-            const gistUrl = 'https://githubusercontent.com';
-            const proxiedUrl = `https://allorigins.win{encodeURIComponent(gistUrl)}&t=${Date.now()}`;
+    const btn = document.getElementById('cloudSyncBtn');
+    // 🔴 THE DATA LINK
+    const gistUrl = 'https://gist.githubusercontent.com/kulo2026/6eb3376bcf2fe8f601ab1e59ffd42074/raw/4f3744f0987add6040fb53c4c288d3e62f2f9a5e/todo.json';
+    
+    // 🟢 THE PROXY (Switching to a simpler one)
+    const finalUrl = `https://corsproxy.io{encodeURIComponent(gistUrl + '?t=' + Date.now())}`;
 
-            btn.textContent = "⌛ 同步中...";
-            try {
-                const response = await fetch(proxiedUrl);
-                const json = await response.json();
-                const data = JSON.parse(json.contents);
-                
-                if (data.items) {
-                    currentData = data.items.map(i => ({...i, date: new Date(i.date)}));
-                    saveLocal();
-                    render();
-                    alert("✅ 雲端同步完成");
-                }
-            } catch (e) { alert("❌ 同步失敗"); }
-            finally { btn.textContent = "🔄 同步雲端"; }
+    btn.textContent = "⌛ 同步中...";
+    try {
+        const response = await fetch(finalUrl);
+        if (!response.ok) throw new Error('Proxy 伺服器無回應');
+        
+        const data = await response.json();
+        
+        if (data && data.items) {
+            currentData = data.items.map(i => ({...i, date: new Date(i.date)}));
+            saveLocal();
+            render();
+            alert("✅ 雲端同步完成");
         }
-
+    } catch (e) { 
+        console.error(e);
+        alert("❌ 同步失敗：請檢查網路連線或稍後再試"); 
+    } finally { 
+        btn.textContent = "🔄 同步雲端"; 
+    }
+}
         // --- 排序與解析 ---
         function parseData() {
             const input = document.getElementById('dataInput');
