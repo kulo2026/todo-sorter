@@ -67,125 +67,90 @@
    </div>
   </div>
   <script>
-    const defaultConfig = {
-      page_title: '日期待辦排序器',
-      background_color: '#0f1117',
-      surface_color: '#181a22',
-      text_color: '#e8eaed',
-      accent_color: '#63d297'
-    };
-
+    // 1. Global Variables
     let currentData = [];
 
-    // 1. App Startup
-    window.onload = () => {
-        // Set Today's Date
+    // 2. Startup - This MUST run to stop the "waiting" state
+    window.onload = function() {
+        console.log("App started");
+        
+        // Show Today's Date
         const today = new Date();
-        const y = today.getFullYear();
-        const m = today.getMonth() + 1;
-        const d = today.getDate();
-        document.getElementById('todayDisplay').textContent = `今日：${y-1911}年${m}月${d}日`;
+        const todayDisp = document.getElementById('todayDisplay');
+        if (todayDisp) {
+            todayDisp.textContent = "今日：" + (today.getFullYear() - 1911) + "年" + (today.getMonth() + 1) + "月" + today.getDate() + "日";
+        }
 
-        // Load Data
+        // Try to load from memory
         const stored = localStorage.getItem('todoData');
         if (stored) {
             try {
-                const parsed = JSON.parse(stored);
-                currentData = parsed.map(item => ({
-                    ...item,
-                    date: new Date(item.date)
-                }));
-                renderResults(currentData);
+                currentData = JSON.parse(stored);
+                renderResults();
             } catch (e) {
-                console.error("Load failed", e);
-                document.getElementById('emptyState').style.display = 'block';
+                console.log("Storage empty or broken");
             }
-        } else {
-            document.getElementById('emptyState').style.display = 'block';
         }
+        
+        // Force hide empty state if data exists
+        document.getElementById('emptyState').style.display = currentData.length > 0 ? 'none' : 'block';
         if (window.lucide) lucide.createIcons();
     };
 
-    // 2. Cloud Sync (Your primary request)
+    // 3. The Sync Function (Direct & Simple)
     async function importFromCloud() {
         const btn = document.getElementById('cloudSyncBtn');
-        btn.innerHTML = '🔄 同步中...';
-        
-        // Permanent Raw Link
+        btn.innerText = '同步中...';
+
         const gistUrl = 'https://gist.githubusercontent.com/kulo2026/6eb3376bcf2fe8f601ab1e59ffd42074/raw/4f3744f0987add6040fb53c4c288d3e62f2f9a5e/todo.json';
-        const proxy = 'https://allorigins.win' + encodeURIComponent(gistUrl + '?t=' + Date.now());
+        const proxyUrl = 'https://allorigins.win' + encodeURIComponent(gistUrl + '?t=' + Date.now());
 
         try {
-            const response = await fetch(proxy);
+            const response = await fetch(proxyUrl);
             const data = await response.json();
             
-            if (data.items) {
-                currentData = data.items.map(item => ({
-                    ...item,
-                    date: new Date(item.date)
-                }));
-                
-                // Save to browser memory
+            if (data && data.items) {
+                currentData = data.items;
                 localStorage.setItem('todoData', JSON.stringify(data.items));
-                renderResults(currentData);
-                alert('✅ 雲端同步完成！');
+                renderResults();
+                alert('✅ 同步完成！');
             }
         } catch (err) {
-            alert('❌ 同步失敗，請檢查網路。');
+            console.error(err);
+            alert('❌ 同步失敗，請檢查 Gist 內容');
         } finally {
             btn.innerHTML = '<i data-lucide="refresh-cw"></i>同步雲端';
             if (window.lucide) lucide.createIcons();
         }
     }
 
-    // 3. Render Logic
-    function renderResults(items) {
+    // 4. Render results to the screen
+    function renderResults() {
         const container = document.getElementById('results');
-        const empty = document.getElementById('emptyState');
-        
-        if (!items || items.length === 0) {
-            empty.style.display = 'block';
-            container.innerHTML = '';
-            return;
-        }
-        
-        empty.style.display = 'none';
-        items.sort((a, b) => a.date - b.date);
+        if (!container) return;
+
+        // Hide empty state
+        document.getElementById('emptyState').style.display = 'none';
+
+        // Sort by date string
+        currentData.sort((a, b) => a.date.localeCompare(b.date));
 
         let html = '';
-        items.forEach(item => {
-            const d = item.date;
-            const dateStr = `${d.getFullYear()-1911}/${d.getMonth()+1}/${d.getDate()}`;
-            
+        currentData.forEach(item => {
             html += `
-            <div class="mb-2 p-4 rounded-lg" style="background:#181a22; border:1px solid #2a2d37;">
-                <p class="text-xs font-bold mb-1" style="color:#63d297;">${dateStr}</p>
+            <div class="mb-2 p-4 rounded-lg border border-slate-700" style="background:#181a22;">
+                <p class="text-xs font-bold text-green-400 mb-1">${item.date}</p>
                 <p class="text-sm text-slate-200">${item.task}</p>
             </div>`;
         });
         container.innerHTML = html;
     }
 
-    // 4. Basic Actions
-    function clearStorage() {
-        if(confirm('確定清除全部資料？')) {
-            localStorage.clear();
-            location.reload();
-        }
-    }
-
-    function downloadData() {
-        const blob = new Blob([localStorage.getItem('todoData')], {type: 'application/json'});
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'backup.json';
-        a.click();
-    }
-
-    // Functions that are currently disabled in this simple version but keep the buttons from crashing
-    function parseData() { alert("此版本已簡化，請使用『同步雲端』載入 Gist 資料。"); }
-    function importData() { alert("此版本暫不支援本地檔案匯入。"); }
+    // 5. Basic Actions to prevent errors
+    function clearStorage() { localStorage.clear(); location.reload(); }
+    function downloadData() { alert("請使用『同步雲端』管理資料"); }
+    function parseData() { alert("請先同步雲端載入資料"); }
+    function importData() { alert("請先同步雲端載入資料"); }
     function openUploadPage() { window.open("https://github.com", '_blank'); }
   </script>
  <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9edd1d2610b28273',t:'MTc3NjQ0NjU2Ny4wMDAwMDA='};var a=document.createElement('script');a.nonce='';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
