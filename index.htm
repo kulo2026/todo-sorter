@@ -87,61 +87,39 @@
     let dateFormatSnapshot = {}; // 儲存每筆任務的原始日期格式（西元年/民國年）
     let originalDateFormatMap = {}; // ★ 新增：映射 task → 原始西元年/民國年日期字串（第一次解析時鎖定）
   window.onload = () => {
+    // 1. Force clear the 'waiting' state immediately
+    const empty = document.getElementById('emptyState');
+    const results = document.getElementById('results');
+    
     try {
-        console.log("App initializing...");
-
-        // 1. Set the Today Display (Using your new format with English weekdays)
-        const today = new Date();
-        const todayText = formatDateString(
-            today.getFullYear(), 
-            today.getMonth() + 1, 
-            today.getDate(), 
-            false // Displays in ROC (Taiwan) year
-        );
-        const todayElement = document.getElementById('todayDisplay');
-        if (todayElement) todayElement.textContent = "今日：" + todayText;
-
-        // 2. Load data from LocalStorage
-        // This function handles the Date conversion and Recurring items
+        // 2. Load the data
         const savedData = loadFromLocalStorage();
         
-        // 3. Setup Configuration
-        const config = window.elementSdk?.config || defaultConfig;
-        const c = { ...defaultConfig, ...config };
-
-        const container = document.getElementById('results');
-        const empty = document.getElementById('emptyState');
-
         if (savedData && savedData.length > 0) {
             currentData = savedData;
-
-            // 4. Sort the list by date
             currentData.sort((a, b) => a.date - b.date);
-
-            // 5. Render to screen
-            renderResults(currentData, c);
-            
-            // 6. Save back to align snapshots
-            saveToLocalStorage();
+            renderResults(currentData, defaultConfig);
+            if (empty) empty.style.display = 'none';
         } else {
-            // 7. If no data, show Empty State and clear container
-            if (container) container.innerHTML = '';
+            // If no data, show the empty state so it's not "stuck"
             if (empty) empty.style.display = 'block';
+            if (results) results.innerHTML = '';
         }
-
-        console.log("Initialization complete.");
-
-    } catch (initErr) {
-        console.error("Initialization Failed:", initErr);
-        // Safety: If it crashes, at least show the empty state so it's not "stuck"
-        document.getElementById('emptyState').style.display = 'block';
+    } catch (e) {
+        console.error("Initialization error:", e);
+        // Fallback: show empty state if code crashes
+        if (empty) empty.style.display = 'block';
     }
 
-    // 8. Refresh Lucide Icons
-    if (window.lucide) {
-        window.lucide.createIcons();
-    }
-};  
+    // 3. Update Today's Display
+    const today = new Date();
+    const todayText = formatDateString(today.getFullYear(), today.getMonth() + 1, today.getDate(), false);
+    const todayDisp = document.getElementById('todayDisplay');
+    if (todayDisp) todayDisp.textContent = "今日：" + todayText;
+
+    // 4. Icons
+    if (window.lucide) lucide.createIcons();
+};
     
   async function importFromCloud() {
     const gistRawUrl = 'https://gist.githubusercontent.com/kulo2026/6eb3376bcf2fe8f601ab1e59ffd42074/raw/4f3744f0987add6040fb53c4c288d3e62f2f9a5e/todo.json';
