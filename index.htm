@@ -89,15 +89,17 @@
     
     
     async function importFromCloud() {
-    // 🟢 PASTE YOUR RAW GIST LINK HERE
-    const gistUrl = 'https://gist.github.com/kulo2026/6eb3376bcf2fe8f601ab1e59ffd42074/raw/1b60dd5000f612ddaca5a5ccccd3f7dbce08b757/todo.json';
+    // 1. MUST use ://githubusercontent.com for the RAW data
+    // I have removed the random version ID so it always pulls your LATEST update
+    const gistRawUrl = 'https://://githubusercontent.com/kulo2026/6eb3376bcf2fe8f601ab1e59ffd42074/raw/todo.json';
+
+    console.log("Connecting to GitHub Gist...");
 
     try {
-        // We add a timestamp (?t=...) to the end to prevent the browser from 
-        // loading "old" data (cache busting)
-        const response = await fetch(gistUrl + '?t=' + Date.now());
+        // Cache busting: add a timestamp to ensure you don't get old data
+        const response = await fetch(gistRawUrl + '?t=' + Date.now());
         
-        if (!response.ok) throw new Error('連線失敗');
+        if (!response.ok) throw new Error('Network response was not ok');
         
         const data = await response.json();
         
@@ -105,21 +107,21 @@
             // Restore snapshots
             baselineSnapshot = data.baselineSnapshot || {};
             dateFormatSnapshot = data.dateFormatSnapshot || {};
-            originalDateFormatMap = data.originalDateFormatMap || {};
             
-            // Rebuild current data
+            // Rebuild currentData
             currentData = data.items.map(item => ({
                 ...item,
                 date: new Date(item.date)
             }));
 
+            // Save to browser and update screen
             saveToLocalStorage();
             renderResults(currentData, defaultConfig);
             alert('✅ 雲端同步完成！');
         }
     } catch (err) {
-        console.error(err);
-        alert('❌ 同步失敗，請檢查 Gist 連結是否正確。');
+        console.error('Detailed Sync Error:', err);
+        alert('❌ 同步失敗：請檢查 Gist 連結或內容格式。');
     }
 }
     
