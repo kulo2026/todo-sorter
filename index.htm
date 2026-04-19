@@ -172,56 +172,6 @@
   localStorage.setItem('originalDateFormatMap', JSON.stringify(originalDateFormatMap));
 }
 
-
-//loadFromLocalStorage 有改過
-function loadFromLocalStorage() {
-  const stored = localStorage.getItem('todoData');
-  if (!stored) return [];
-  
-  try {
-    const parsed = JSON.parse(stored);
-    
-    // Load snapshots
-    baselineSnapshot = JSON.parse(localStorage.getItem('baselineSnapshot') || '{}');
-    dateFormatSnapshot = JSON.parse(localStorage.getItem('dateFormatSnapshot') || '{}');
-    originalDateFormatMap = JSON.parse(localStorage.getItem('originalDateFormatMap') || '{}');
-    
-    let allItems = [];
-
-    // Process each saved item
-    parsed.forEach(item => {
-      // 1. Create a proper Date object from the saved string
-      const [y, m, d] = item.date.split('-').map(Number);
-      const dateObj = new Date(y, m - 1, d);
-      dateObj.setHours(0, 0, 0, 0);
-
-      // 2. If it has a frequency, we usually want to re-generate the series 
-      // to ensure the "Nth Weekday" logic is applied correctly to the full year
-      if (item.frequency && item.frequency !== "") {
-        // We only generate if this is the first time we encounter this task 
-        // to avoid duplicates (assuming tasks are unique)
-        const exists = allItems.some(existing => existing.task === item.task);
-        if (!exists) {
-          const generated = generateRecurringItems(item);
-          allItems.push(...generated);
-        }
-      } else {
-        // Regular item
-        allItems.push({
-          ...item,
-          date: dateObj
-        });
-      }
-    });
-
-    return allItems;
-  } catch (e) {
-    console.error("Failed to load data:", e);
-    return [];
-  }
-}
-
-
 //loadFromLocalStorage 有改過
 function loadFromLocalStorage() {
   const stored = localStorage.getItem('todoData');
