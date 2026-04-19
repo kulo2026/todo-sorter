@@ -86,7 +86,62 @@
     let baselineSnapshot = {}; // 儲存每筆任務的原始基準日期，永遠不改動
     let dateFormatSnapshot = {}; // 儲存每筆任務的原始日期格式（西元年/民國年）
     let originalDateFormatMap = {}; // ★ 新增：映射 task → 原始西元年/民國年日期字串（第一次解析時鎖定）
-    
+  window.onload = () => {
+    try {
+        console.log("App initializing...");
+
+        // 1. Set the Today Display (Using your new format with English weekdays)
+        const today = new Date();
+        const todayText = formatDateString(
+            today.getFullYear(), 
+            today.getMonth() + 1, 
+            today.getDate(), 
+            false // Displays in ROC (Taiwan) year
+        );
+        const todayElement = document.getElementById('todayDisplay');
+        if (todayElement) todayElement.textContent = "今日：" + todayText;
+
+        // 2. Load data from LocalStorage
+        // This function handles the Date conversion and Recurring items
+        const savedData = loadFromLocalStorage();
+        
+        // 3. Setup Configuration
+        const config = window.elementSdk?.config || defaultConfig;
+        const c = { ...defaultConfig, ...config };
+
+        const container = document.getElementById('results');
+        const empty = document.getElementById('emptyState');
+
+        if (savedData && savedData.length > 0) {
+            currentData = savedData;
+
+            // 4. Sort the list by date
+            currentData.sort((a, b) => a.date - b.date);
+
+            // 5. Render to screen
+            renderResults(currentData, c);
+            
+            // 6. Save back to align snapshots
+            saveToLocalStorage();
+        } else {
+            // 7. If no data, show Empty State and clear container
+            if (container) container.innerHTML = '';
+            if (empty) empty.style.display = 'block';
+        }
+
+        console.log("Initialization complete.");
+
+    } catch (initErr) {
+        console.error("Initialization Failed:", initErr);
+        // Safety: If it crashes, at least show the empty state so it's not "stuck"
+        document.getElementById('emptyState').style.display = 'block';
+    }
+
+    // 8. Refresh Lucide Icons
+    if (window.lucide) {
+        window.lucide.createIcons();
+    }
+};  
     
   async function importFromCloud() {
     const gistRawUrl = 'https://gist.githubusercontent.com/kulo2026/6eb3376bcf2fe8f601ab1e59ffd42074/raw/4f3744f0987add6040fb53c4c288d3e62f2f9a5e/todo.json';
@@ -222,36 +277,37 @@ function loadFromLocalStorage() {
     originalDateFormatMap = JSON.parse(localStorage.getItem('originalDateFormatMap') || '{}');
     
     let allItems = [];
+    let processedTasks = new Set();
 
-    // Process each saved item
     parsed.forEach(item => {
-      // 1. Create a proper Date object from the saved string
+      // Create Date object safely
       const [y, m, d] = item.date.split('-').map(Number);
       const dateObj = new Date(y, m - 1, d);
       dateObj.setHours(0, 0, 0, 0);
 
-      // 2. If it has a frequency, we usually want to re-generate the series 
-      // to ensure the "Nth Weekday" logic is applied correctly to the full year
-      if (item.frequency && item.frequency !== "") {
-        // We only generate if this is the first time we encounter this task 
-        // to avoid duplicates (assuming tasks are unique)
-        const exists = allItems.some(existing => existing.task === item.task);
-        if (!exists) {
+      // 如果有頻率且尚未處理過該任務的生成
+      if (item.frequency && item.frequency !== "" && !processedTasks.has(item.task)) {
+        processedTasks.add(item.task);
+        try {
           const generated = generateRecurringItems(item);
-          allItems.push(...generated);
+          // 限制生成數量，防止當機 (例如最多 1000 筆)
+          if (generated.length > 0) {
+            allItems.push(...generated.slice(0, 1000));
+          }
+        } catch (genErr) {
+          console.error("生成重複項目失敗:", genErr);
+          // 降級處理：只加入單一項目
+          allItems.push({ ...item, date: dateObj });
         }
-      } else {
-        // Regular item
-        allItems.push({
-          ...item,
-          date: dateObj
-        });
+      } else if (!item.frequency) {
+        // 一般無重複項目
+        allItems.push({ ...item, date: dateObj });
       }
     });
 
     return allItems;
   } catch (e) {
-    console.error("Failed to load data:", e);
+    console.error("解析 LocalStorage 失敗:", e);
     return [];
   }
 }
