@@ -25,15 +25,28 @@
         <!-- Controls -->
         <div class="rounded-xl p-4 mb-6" style="background: #181a22; border: 1px solid #2a2d37;">
             <textarea id="dataInput" rows="3" class="w-full rounded-lg px-4 py-3 text-sm bg-[#0f1117] border border-[#2a2d37] mb-3" placeholder="貼上資料 (例如: 1150423 聚餐)"></textarea>
-            <div class="flex flex-wrap gap-2 justify-between">
-                <button onclick="parseData()" class="bg-[#63d297] text-[#0f1117] px-4 py-1.5 rounded-lg font-bold text-xs">排序顯示</button>
-                <div class="flex gap-2">
-                    <button id="cloudSyncBtn" onclick="importFromCloud()" class="bg-[#1e293b] text-[#63d297] border border-[#334155] px-3 py-1.5 rounded-lg text-xs font-medium">🔄 同步雲端</button>
+            
+                    
                     <button onclick="clearStorage()" class="bg-red-900/20 text-red-400 border border-red-900/50 px-3 py-1.5 rounded-lg text-xs font-medium">清除全部</button>
                 </div>
             </div>
         </div>
-
+<div class="flex flex-wrap gap-2 justify-between">
+    <button onclick="parseData()" class="bg-[#63d297] text-[#0f1117] px-4 py-1.5 rounded-lg font-bold text-xs">排序顯示</button>
+    
+    <div class="flex gap-2">
+        <!-- Renamed Button -->
+        <button id="cloudSyncBtn" onclick="importFromCloud()" class="bg-[#1e293b] text-[#63d297] border border-[#334155] px-3 py-1.5 rounded-lg text-xs font-medium">☁️ 雲端下載</button>
+        
+        <!-- New Button 1 -->
+        <button onclick="manualSaveLocal()" class="bg-blue-900/20 text-blue-400 border border-blue-900/50 px-3 py-1.5 rounded-lg text-xs font-medium">💾 儲存本地</button>
+        
+        <!-- New Button 2 -->
+        <button onclick="downloadJSON()" class="bg-purple-900/20 text-purple-400 border border-purple-900/50 px-3 py-1.5 rounded-lg text-xs font-medium">📥 本地下載</button>
+        
+        <button onclick="clearStorage()" class="bg-red-900/20 text-red-400 border border-red-900/50 px-3 py-1.5 rounded-lg text-xs font-medium">清除全部</button>
+    </div>
+</div>
         <!-- Results -->
         <div id="results" class="space-y-1"></div>
         <div id="emptyState" class="text-center py-16 text-slate-600">
