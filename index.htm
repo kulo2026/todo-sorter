@@ -149,28 +149,64 @@
     
     
     // LocalStorage 儲存和讀取
-    function saveToLocalStorage() {
+   function saveToLocalStorage() {
   const storageData = currentData.map(item => {
-    // Helper to get local YYYY-MM-DD without timezone shifts
     const d = item.date;
     const localDateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     
     return {
-      date: localDateStr, // Store as string to prevent ISO shifting
+      date: localDateStr,
       dateStr: item.dateStr,
       task: item.task,
       frequency: item.frequency || '',
-      // Ensure baselineDate exists; if not, use the item's own date
       baselineDate: item.baselineDate || localDateStr,
       originalDateStr: item.originalDateStr
     };
   });
 
+  // Create the "Package" for consistency
+  const finalPackage = {
+    items: storageData,
+    baselineSnapshot: baselineSnapshot,
+    dateFormatSnapshot: dateFormatSnapshot,
+    originalDateFormatMap: originalDateFormatMap
+  };
+
+  // Save the whole package to one key, or keep them separate as you have
   localStorage.setItem('todoData', JSON.stringify(storageData));
   localStorage.setItem('baselineSnapshot', JSON.stringify(baselineSnapshot));
   localStorage.setItem('dateFormatSnapshot', JSON.stringify(dateFormatSnapshot));
   localStorage.setItem('originalDateFormatMap', JSON.stringify(originalDateFormatMap));
 }
+function downloadData() {
+    const storageData = currentData.map(item => {
+        const d = item.date;
+        return {
+            date: `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`,
+            dateStr: item.dateStr,
+            task: item.task,
+            frequency: item.frequency || '',
+            baselineDate: item.baselineDate,
+            originalDateStr: item.originalDateStr
+        };
+    });
+
+    const exportObj = {
+        items: storageData,
+        baselineSnapshot: baselineSnapshot,
+        dateFormatSnapshot: dateFormatSnapshot,
+        originalDateFormatMap: originalDateFormatMap
+    };
+    
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportObj, null, 2));
+    const downloadAnchorNode = document.createElement('a');
+    downloadAnchorNode.setAttribute("href", dataStr);
+    downloadAnchorNode.setAttribute("download", "todo_backup.json");
+    document.body.appendChild(downloadAnchorNode);
+    downloadAnchorNode.click();
+    downloadAnchorNode.remove();
+}
+  
 
 //loadFromLocalStorage 有改過
 function loadFromLocalStorage() {
@@ -1047,27 +1083,47 @@ function doClearStorage() {
     });
 };
     setupImportListener();
+const today = new Date();
+document.getElementById('todayDisplay').textContent = "今日：" + formatDateString(
+    today.getFullYear(), 
+    today.getMonth() + 1, 
+    today.getDate(), 
+    false // Use ROC year for display
+);
 
-    document.getElementById('todayDisplay').textContent = getTodayDisplay();
+// 2. Load data from LocalStorage
+const savedData = loadFromLocalStorage();
+
+if (savedData && savedData.length > 0) {
+    // ★ 核心邏輯：直接加載存儲的數據
+    // 因為 loadFromLocalStorage 內部已經處理了 Date 對象轉換與頻率重新生成
+    currentData = savedData;
+
+    // 3. Perform sorting by date
+    currentData.sort((a, b) => a.date - b.date);
+
+    // 4. Determine configuration
+    // Use the SDK config if available, otherwise use your defaultConfig
+    const config = window.elementSdk?.config || defaultConfig;
+    const c = { ...defaultConfig, ...config };
+
+    // 5. Render results to the screen
+    // This will now use your updated renderResults with Book Icons and Colors
+    renderResults(currentData, c);
     
-    // 載入已儲存的資料
-    const savedData = loadFromLocalStorage();
-    if (savedData.length > 0) {
-      // ★ 核心修正：重新載入時不推移任何項目！
-      // 因為儲存的資料已經是推移後的結果
-      // 只需直接用儲存的日期即可
-      currentData = savedData;
-      
-      // 排序
-      currentData.sort((a, b) => a.date - b.date);
-      
-      // 保存更新後的資料
-      saveToLocalStorage();
-      
-      const config = window.elementSdk?.config || defaultConfig;
-      const c = { ...defaultConfig, ...config };
-      renderResults(currentData, c);
-    }
+    // 6. Sync back to LocalStorage to ensure snapshots and items are aligned
+    saveToLocalStorage();
+} else {
+    // If no data, show the empty state
+    const empty = document.getElementById('emptyState');
+    if (empty) empty.style.display = 'block';
+}
+
+// 7. Re-initialize icons (Lucide)
+if (window.lucide) {
+    window.lucide.createIcons();
+}
+
   </script>
  <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9edd1d2610b28273',t:'MTc3NjQ0NjU2Ny4wMDAwMDA='};var a=document.createElement('script');a.nonce='';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
