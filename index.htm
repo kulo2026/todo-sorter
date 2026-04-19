@@ -88,40 +88,38 @@
     let originalDateFormatMap = {}; // ★ 新增：映射 task → 原始西元年/民國年日期字串（第一次解析時鎖定）
     
     
-    async function importFromCloud() {
-    // 1. MUST use ://githubusercontent.com for the RAW data
-    // I have removed the random version ID so it always pulls your LATEST update
-    const gistRawUrl = 'https://://githubusercontent.com/kulo2026/6eb3376bcf2fe8f601ab1e59ffd42074/raw/todo.json';
+   async function importFromCloud() {
+    // 🔴 修正後的正確網址 (已經移除了多餘的 :// 並加上了 gist.)
+    const gistRawUrl = 'https://gist.githubusercontent.com/kulo2026/6eb3376bcf2fe8f601ab1e59ffd42074/raw/392793698b384d774f8bb5f0c128d94a18ce0abf/todo.json';
 
-    console.log("Connecting to GitHub Gist...");
+    console.log("正在從 GitHub Gist 同步資料...");
 
     try {
-        // Cache busting: add a timestamp to ensure you don't get old data
+        // 使用 timestamp 確保抓到的是最新資料，而非瀏覽器快取
         const response = await fetch(gistRawUrl + '?t=' + Date.now());
         
-        if (!response.ok) throw new Error('Network response was not ok');
+        if (!response.ok) throw new Error('雲端連線失敗，狀態碼：' + response.status);
         
         const data = await response.json();
         
         if (data && data.items) {
-            // Restore snapshots
+            // 恢復快照與資料
             baselineSnapshot = data.baselineSnapshot || {};
             dateFormatSnapshot = data.dateFormatSnapshot || {};
             
-            // Rebuild currentData
             currentData = data.items.map(item => ({
                 ...item,
                 date: new Date(item.date)
             }));
 
-            // Save to browser and update screen
+            // 儲存至本地並刷新 UI
             saveToLocalStorage();
             renderResults(currentData, defaultConfig);
             alert('✅ 雲端同步完成！');
         }
     } catch (err) {
-        console.error('Detailed Sync Error:', err);
-        alert('❌ 同步失敗：請檢查 Gist 連結或內容格式。');
+        console.error('詳細同步錯誤:', err);
+        alert('❌ 同步失敗：請確認 Gist 連結字串是否完全正確。');
     }
 }
     
