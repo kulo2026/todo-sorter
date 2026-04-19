@@ -35,46 +35,46 @@
         const today = new Date();
         document.getElementById('todayDisplay').textContent = "今日：" + (today.getFullYear() - 1911) + "年" + (today.getMonth() + 1) + "月" + today.getDate() + "日";
 
-        async function syncData() {
-            const status = document.getElementById('status');
-            const results = document.getElementById('results');
-            
-            status.textContent = "⌛ 正在連線至 GitHub...";
-            
-            // 您的 Gist RAW 連結
-            const url = 'https://gist.githubusercontent.com/kulo2026/6eb3376bcf2fe8f601ab1e59ffd42074/raw/4f3744f0987add6040fb53c4c288d3e62f2f9a5e/todo.json' + Date.now();
+       async function syncData() {
+    const status = document.getElementById('status');
+    const results = document.getElementById('results');
+    
+    // 🔴 THE LINK TEST
+    // Please check if "todo.json" is the EXACT filename inside your Gist
+    const url = 'https://gist.githubusercontent.com/kulo2026/6eb3376bcf2fe8f601ab1e59ffd42074/raw/4f3744f0987add6040fb53c4c288d3e62f2f9a5e/todo.json';
 
-            try {
-                const response = await fetch(url);
-                if (!response.ok) throw new Error("網路連線失敗");
-                
-                const data = await response.json();
-                
-                if (data && data.items) {
-                    // 排序資料
-                    data.items.sort((a, b) => a.date.localeCompare(b.date));
-                    
-                    // 渲染 HTML
-                    let html = '';
-                    data.items.forEach(item => {
-                        html += `
-                            <div class="task-card">
-                                <div class="date-label">${item.date}</div>
-                                <div class="task-text">${item.task}</div>
-                            </div>
-                        `;
-                    });
-                    
-                    results.innerHTML = html;
-                    status.textContent = "✅ 同步完成！共 " + data.items.length + " 筆資料";
-                } else {
-                    status.textContent = "❌ 資料格式錯誤 (找不到 items)";
-                }
-            } catch (err) {
-                console.error(err);
-                status.textContent = "❌ 同步失敗：" + err.message;
-            }
+    status.innerHTML = `⌛ 正在嘗試連線至：<br><small>${url}</small>`;
+
+    try {
+        const response = await fetch(url + '?t=' + Date.now());
+        
+        if (response.status === 404) {
+            throw new Error("找不到檔案 (404)。請確認 Gist 中的檔名是否為 todo.json");
         }
+        
+        if (!response.ok) throw new Error("連線失敗：" + response.status);
+        
+        const data = await response.json();
+        
+        if (data && data.items) {
+            let html = '';
+            data.items.sort((a, b) => a.date.localeCompare(b.date));
+            data.items.forEach(item => {
+                html += `<div class="task-card">
+                            <div class="date-label">${item.date}</div>
+                            <div class="task-text">${item.task}</div>
+                         </div>`;
+            });
+            results.innerHTML = html;
+            status.textContent = "✅ 同步成功！";
+        }
+    } catch (err) {
+        console.error(err);
+        status.style.color = "#f87171";
+        status.innerHTML = "❌ 錯誤： " + err.message + 
+            "<br><br>💡 提示：請開啟 <a href='https://github.com' target='_blank' style='color:#63d297;'>您的 Gist 頁面</a> 確認檔名是否為 <b>todo.json</b>";
+    }
+}
     </script>
 </body>
 </html>
