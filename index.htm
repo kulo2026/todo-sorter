@@ -35,44 +35,49 @@
         const today = new Date();
         document.getElementById('todayDisplay').textContent = "今日：" + (today.getFullYear() - 1911) + "年" + (today.getMonth() + 1) + "月" + today.getDate() + "日";
 
-       async function syncData() {
+      async function syncData() {
     const status = document.getElementById('status');
     const results = document.getElementById('results');
     
-    // 🔴 THE LINK TEST
-    // Please check if "todo.json" is the EXACT filename inside your Gist
-    const url = 'https://gist.githubusercontent.com/kulo2026/6eb3376bcf2fe8f601ab1e59ffd42074/raw/4f3744f0987add6040fb53c4c288d3e62f2f9a5e/todo.json';
-
-    status.innerHTML = `⌛ 正在嘗試連線至：<br><small>${url}</small>`;
+    status.textContent = "⌛ 正在連線至雲端 (使用代理伺服器)...";
+    
+    // 1. Your RAW Gist URL
+    const gistUrl = 'https://gist.githubusercontent.com/kulo2026/6eb3376bcf2fe8f601ab1e59ffd42074/raw/4f3744f0987add6040fb53c4c288d3e62f2f9a5e/todo.json
+';
+    
+    // 2. Wrap it in a Proxy to prevent "Network Failed" errors on GitHub Pages
+    const proxiedUrl = `https://allorigins.win{encodeURIComponent(gistUrl)}&callback=?&t=${Date.now()}`;
 
     try {
-        const response = await fetch(url + '?t=' + Date.now());
+        const response = await fetch(proxiedUrl);
+        if (!response.ok) throw new Error("代理伺服器連線失敗");
         
-        if (response.status === 404) {
-            throw new Error("找不到檔案 (404)。請確認 Gist 中的檔名是否為 todo.json");
-        }
-        
-        if (!response.ok) throw new Error("連線失敗：" + response.status);
-        
-        const data = await response.json();
+        const json = await response.json();
+        // AllOrigins returns the data inside a 'contents' string
+        const data = JSON.parse(json.contents);
         
         if (data && data.items) {
-            let html = '';
+            // Sort by date
             data.items.sort((a, b) => a.date.localeCompare(b.date));
+            
+            let html = '';
             data.items.forEach(item => {
-                html += `<div class="task-card">
-                            <div class="date-label">${item.date}</div>
-                            <div class="task-text">${item.task}</div>
-                         </div>`;
+                html += `
+                    <div class="task-card">
+                        <div class="date-label">${item.date}</div>
+                        <div class="task-text">${item.task}</div>
+                    </div>
+                `;
             });
+            
             results.innerHTML = html;
             status.textContent = "✅ 同步成功！";
+        } else {
+            status.textContent = "❌ 資料格式不符";
         }
     } catch (err) {
-        console.error(err);
-        status.style.color = "#f87171";
-        status.innerHTML = "❌ 錯誤： " + err.message + 
-            "<br><br>💡 提示：請開啟 <a href='https://github.com' target='_blank' style='color:#63d297;'>您的 Gist 頁面</a> 確認檔名是否為 <b>todo.json</b>";
+        console.error("Sync Error:", err);
+        status.textContent = "❌ 同步失敗：請確認 Gist 內含有 items 陣列";
     }
 }
     </script>
