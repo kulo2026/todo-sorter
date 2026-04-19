@@ -1,34 +1,80 @@
 <!doctype html>
-<html>
+<html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
-    <title>Test Page</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>日期待辦排序器 - 雲端版</title>
     <style>
-        body { background: #0f1117; color: white; font-family: sans-serif; text-align: center; padding-top: 50px; }
-        #status { color: #63d297; font-size: 24px; margin-bottom: 20px; }
-        button { padding: 10px 20px; cursor: pointer; }
+        body { background: #0f1117; color: #e8eaed; font-family: sans-serif; padding: 20px; max-width: 600px; margin: 0 auto; }
+        .header { text-align: center; margin-bottom: 30px; }
+        .btn-sync { background: #63d297; color: #0f1117; border: none; padding: 12px 24px; rounded: 8px; cursor: pointer; font-weight: bold; width: 100%; font-size: 16px; border-radius: 8px; }
+        .task-card { background: #181a22; border: 1px solid #2a2d37; padding: 15px; border-radius: 12px; margin-top: 10px; }
+        .date-label { color: #63d297; font-size: 12px; font-weight: bold; margin-bottom: 5px; }
+        .task-text { font-size: 14px; }
+        #status { text-align: center; color: #7a7f8a; font-size: 14px; margin-top: 10px; }
     </style>
 </head>
 <body>
-    <div id="status">程式載入中...</div>
-    <div id="today"></div>
-    <br>
-    <button onclick="testFunction()">點擊測試按鈕</button>
+
+    <div class="header">
+        <h1>日期待辦排序器</h1>
+        <div id="todayDisplay">載入中...</div>
+    </div>
+
+    <button class="btn-sync" onclick="syncData()">🔄 同步雲端資料</button>
+    <div id="status">點擊按鈕從 GitHub 抓取資料</div>
+
+    <hr style="border: 0; border-top: 1px solid #2a2d37; margin: 25px 0;">
+
+    <div id="results">
+        <!-- 資料會顯示在這裡 -->
+    </div>
 
     <script>
-        // 1. Check if script runs at all
-        document.getElementById('status').textContent = "✅ 程式已成功啟動";
+        // 1. 顯示今日日期
+        const today = new Date();
+        document.getElementById('todayDisplay').textContent = "今日：" + (today.getFullYear() - 1911) + "年" + (today.getMonth() + 1) + "月" + today.getDate() + "日";
 
-        // 2. Show Date
-        const now = new Date();
-        document.getElementById('today').textContent = "今日日期：" + now.toLocaleDateString();
+        async function syncData() {
+            const status = document.getElementById('status');
+            const results = document.getElementById('results');
+            
+            status.textContent = "⌛ 正在連線至 GitHub...";
+            
+            // 您的 Gist RAW 連結
+            const url = 'https://githubusercontent.com' + Date.now();
 
-        // 3. Test Button
-        function testFunction() {
-            alert("按鈕運作正常！");
+            try {
+                const response = await fetch(url);
+                if (!response.ok) throw new Error("網路連線失敗");
+                
+                const data = await response.json();
+                
+                if (data && data.items) {
+                    // 排序資料
+                    data.items.sort((a, b) => a.date.localeCompare(b.date));
+                    
+                    // 渲染 HTML
+                    let html = '';
+                    data.items.forEach(item => {
+                        html += `
+                            <div class="task-card">
+                                <div class="date-label">${item.date}</div>
+                                <div class="task-text">${item.task}</div>
+                            </div>
+                        `;
+                    });
+                    
+                    results.innerHTML = html;
+                    status.textContent = "✅ 同步完成！共 " + data.items.length + " 筆資料";
+                } else {
+                    status.textContent = "❌ 資料格式錯誤 (找不到 items)";
+                }
+            } catch (err) {
+                console.error(err);
+                status.textContent = "❌ 同步失敗：" + err.message;
+            }
         }
-        
-        console.log("Script execution finished.");
     </script>
 </body>
 </html>
