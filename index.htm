@@ -92,6 +92,33 @@
         btn.textContent = "🔄 同步雲端"; 
     }
 }
+ function saveLocal() {
+    const dataToSave = {
+        items: currentData.map(item => ({
+            task: item.task,
+            // Convert Date object to string format YYYY-MM-DD
+            date: item.date instanceof Date ? item.date.toISOString().split('T')[0] : item.date
+        }))
+    };
+    localStorage.setItem('todoData', JSON.stringify(dataToSave));
+}
+
+function loadLocal() {
+    const s = localStorage.getItem('todoData');
+    if (s) {
+        const parsed = JSON.parse(s);
+        // Handle both simple list or {items: []} format
+        const list = Array.isArray(parsed) ? parsed : (parsed.items || []);
+        currentData = list.map(i => ({
+            ...i,
+            date: new Date(i.date)
+        }));
+        render();
+    }
+} 
+        
+        
+        
         // --- 排序與解析 ---
         function parseData() {
             const input = document.getElementById('dataInput');
