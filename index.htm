@@ -89,38 +89,51 @@
     
     
   async function importFromCloud() {
-    console.log("Connecting to GitHub Gist...");
-
-    // 🔴 修正後的完整網址：確保沒有多餘的 :// 且包含 gist. 前綴
     const gistRawUrl = 'https://gist.githubusercontent.com/kulo2026/6eb3376bcf2fe8f601ab1e59ffd42074/raw/4f3744f0987add6040fb53c4c288d3e62f2f9a5e/todo.json';
+    
+    // Change button text to show it is working
+    const btn = document.getElementById('cloudSyncBtn');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<span>🔄 同步中...</span>';
+    btn.disabled = true;
 
     try {
-        // 使用 timestamp 避免抓到舊的快取資料
+        // The Cache Buster we discussed
         const response = await fetch(gistRawUrl + '?t=' + Date.now());
         
-        if (!response.ok) throw new Error('雲端連線失敗，狀態碼：' + response.status);
+        if (!response.ok) throw new Error('HTTP ' + response.status);
         
         const data = await response.json();
         
         if (data && data.items) {
-            // 恢復資料快照
+            // Restore snapshots
             baselineSnapshot = data.baselineSnapshot || {};
             dateFormatSnapshot = data.dateFormatSnapshot || {};
             
-            // 將字串日期轉換回 Date 物件
+            // Clean and rebuild the data
             currentData = data.items.map(item => ({
                 ...item,
                 date: new Date(item.date)
             }));
 
-            // 儲存並更新畫面
             saveToLocalStorage();
             renderResults(currentData, defaultConfig);
-            alert('✅ 雲端同步完成！');
+            
+            // Success feedback
+            btn.innerHTML = '<span>✅ 同步完成</span>';
+            setTimeout(() => {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }, 2000);
+
+        } else {
+            throw new Error('資料格式不正確');
         }
     } catch (err) {
-        console.error('詳細同步錯誤:', err);
-        alert('❌ 同步失敗：請檢查 index.html 中的網址字串是否完全正確。');
+        console.error('Sync Error:', err);
+        alert('❌ 同步失敗：' + err.message);
+        btn.innerHTML = originalText;
+        btn.disabled = false;
     }
 }
     // 函數import匯入檔案函數 - 直接點擊隱藏的檔案輸入框
