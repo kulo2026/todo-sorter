@@ -1,157 +1,160 @@
 <!doctype html>
 <html lang="zh-Hant">
- <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>日期待辦排序器</title>
-  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
-  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
-   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&amp;display=swap" rel="stylesheet">
-  <style>
-    * { box-sizing: border-box; }
-    html, body { height: 100%; width: 100%; margin: 0; padding: 0; }
-    body { font-family: 'Noto Sans TC', sans-serif; background: #0f1117; }
-    .mono { font-family: 'JetBrains Mono', monospace; }
-    .timeline-dot { width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; }
-    .timeline-line { width: 2px; flex-shrink: 0; }
-    textarea:focus { outline: none; }
-    #app { height: 100%; width: 100%; overflow-y: auto; background: #0f1117; }
-    .container-wrapper { max-width: 48rem; margin: 0 auto; padding: 2.5rem 1rem; }
-  </style>
-  <style>body { box-sizing: border-box; }</style>
-  </head>
- <body class="h-full w-full">
-  <div id="app" class="h-full w-full overflow-auto" style="background: #0f1117;">
-   <div class="max-w-3xl mx-auto px-4 py-10 sm:py-16"><!-- Header -->
-    <div class="mb-8 text-center">
-     <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full mb-4" style="background: rgba(99,210,151,0.1); border: 1px solid rgba(99,210,151,0.2);"><i data-lucide="calendar-check" style="width:16px;height:16px;color:#63d297;"></i> <span class="text-xs font-medium" style="color:#63d297;">自動排序</span>
-     </div>
-     <h1 id="mainTitle" class="text-3xl sm:text-4xl font-bold tracking-tight" style="color:#e8eaed;">日期待辦排序器</h1>
-     <p class="mt-2 text-sm" style="color:#7a7f8a;">支援西元年、民國年，自動依日期排序顯示</p>
-     <div id="todayDisplay" class="mt-4 inline-block px-4 py-2 rounded-lg text-sm font-medium" style="background:#1e2029; color:#63d297; border:1px solid #2a2d37;">
-      今日：115年4月17日（週五）
-     </div>
-    </div><!-- Input Area -->
-    <div class="rounded-xl p-[1px] mb-6" style="background: linear-gradient(135deg, rgba(99,210,151,0.3), rgba(99,210,151,0.05));">
-     <div class="rounded-xl p-4" style="background: #181a22;"><label class="block text-xs font-medium mb-2" style="color:#7a7f8a;"> <i data-lucide="clipboard-paste" style="width:14px;height:14px;display:inline-block;vertical-align:-2px;margin-right:4px;"></i> 貼上資料 </label> <textarea id="dataInput" rows="6" class="w-full rounded-lg px-4 py-3 text-sm resize-y mono" style="background:#0f1117; color:#c9ccd2; border:1px solid #2a2d37;" placeholder="範例格式：
-1150110(每季) 分級檢核  日期緊連(每季)表示會自動按季重複     
-1150720 團隊聚餐
-1150408 
-第七次燃煤供用會議"></textarea>
-      <div class="flex items-center justify-between mt-3 gap-2 flex-wrap">
-       <p class="text-xs" style="color:#50545e;">支援格式：民國YYYMMDD格式</p>
-       <div class="flex gap-2 items-center flex-wrap"><button id="clearBtn" class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors" style="background:#1e2029; color:#7a7f8a; border:1px solid #2a2d37;" onclick="clearAll()">清除</button> <button id="parseBtn" class="px-4 py-1.5 rounded-lg text-xs font-bold transition-all" style="background:#63d297; color:#0f1117;" onclick="parseData()">排序顯示</button>
-       </div>
-      </div><!-- Storage Management Buttons -->
-      <div class="flex gap-2 items-center flex-wrap mt-4 pt-4 border-t" style="border-color:#2a2d37;">
-       <p class="text-xs" style="color:#7a7f8a;"><i data-lucide="database" style="width:14px;height:14px;display:inline-block;vertical-align:-2px;margin-right:4px;"></i>本地儲存</p>
-       <div class="flex gap-2 items-center flex-wrap ml-auto"><button id="downloadBtn" class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors" style="background:#2a2d37; color:#7a7f8a; border:1px solid #3a3d47;" onclick="downloadData()" title="儲存當前資料為 JSON 檔案"> <i data-lucide="save" style="width:14px;height:14px;display:inline-block;vertical-align:-2px;margin-right:4px;"></i>儲存 </button> <button id="importBtn" class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors" style="background:#2a2d37; color:#7a7f8a; border:1px solid #3a3d47;" onclick="importData()" title="匯入之前下載的 JSON 檔案"> <i data-lucide="file-down" style="width:14px;height:14px;display:inline-block;vertical-align:-2px;margin-right:4px;"></i>匯入 </button> <button id="clearStorageBtn" class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors" style="background:#2a1a1a; color:#f87171; border:1px solid #7f1d1d;" onclick="clearStorage()" title="清除所有儲存的資料"> <i data-lucide="trash-2" style="width:14px;height:14px;display:inline-block;vertical-align:-2px;margin-right:4px;"></i>清除儲存 </button><button id="cloudUploadBtn" class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors" 
-  style="background:#2a2d37; color:#63d297; border:1px solid #3a3d47;" 
-  onclick="openUploadPage()" title="下載並開啟雲端上傳頁面"> 
-  <i data-lucide="upload-cloud" style="width:14px;height:14px;display:inline-block;vertical-align:-2px;margin-right:4px;"></i>上傳雲端 
-</button>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>日期待辦排序器</title>
+    <script src="https://tailwindcss.com"></script>
+    <script src="https://jsdelivr.net"></script>
+    <link href="https://googleapis.com" rel="stylesheet">
+    <style>
+        body { font-family: 'Noto Sans TC', sans-serif; background: #0f1117; color: #e8eaed; }
+        .item-card { background: #181a22; border: 1px solid #2a2d37; transition: all 0.2s; }
+        .item-card:hover { border-color: #63d297; }
+    </style>
+</head>
+<body class="p-4 sm:p-8">
+    <div class="max-w-2xl mx-auto">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <h1 class="text-3xl font-bold mb-2">日期待辦排序器</h1>
+            <div id="todayDisplay" class="text-green-400 font-mono">載入中...</div>
+        </div>
 
-<button id="cloudSyncBtn" class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors" 
-        style="background:#1e293b; color:#63d297; border:1px solid #334155;" 
-        onclick="importFromCloud()">
-    <i data-lucide="refresh-cw" style="width:14px;height:14px;display:inline-block;vertical-align:-2px;margin-right:4px;"></i>同步雲端
-</button>
-       </div>
-      </div><input type="file" id="importFile" accept=".json" style="display:none;">
-     </div>
-    </div><!-- Results -->
-    <div id="results" class="space-y-1"></div><!-- Empty State -->
-    <div id="emptyState" class="text-center py-16" style="color:#3a3d47;"><i data-lucide="list-todo" style="width:48px;height:48px;margin:0 auto 12px;display:block;"></i>
-     <p class="text-sm">貼上資料後按下「排序顯示」</p>
+        <!-- Controls -->
+        <div class="bg-[#181a22] p-4 rounded-xl border border-[#2a2d37] mb-6">
+            <textarea id="dataInput" rows="3" class="w-full bg-[#0f1117] border border-[#2a2d37] rounded-lg p-3 text-sm mb-3" placeholder="貼上資料..."></textarea>
+            <div class="flex flex-wrap gap-2 justify-between">
+                <button onclick="parseData()" class="bg-[#63d297] text-[#0f1117] px-4 py-2 rounded-lg font-bold text-sm">排序顯示</button>
+                <div class="flex gap-2">
+                    <button id="cloudSyncBtn" onclick="importFromCloud()" class="bg-slate-800 px-3 py-2 rounded-lg text-xs">同步雲端</button>
+                    <button onclick="clearStorage()" class="bg-red-900/30 text-red-400 px-3 py-2 rounded-lg text-xs">清除</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results -->
+        <div id="results" class="space-y-3"></div>
+        
+        <!-- Empty State -->
+        <div id="emptyState" class="text-center py-20 text-slate-600">
+            <p>目前沒有待辦事項</p>
+        </div>
     </div>
-   </div>
-  </div>
-  <script>
-    // 1. Global Variables
-    let currentData = [];
 
-    // 2. Startup - This MUST run to stop the "waiting" state
-    window.onload = function() {
-        console.log("App started");
-        
-        // Show Today's Date
-        const today = new Date();
-        const todayDisp = document.getElementById('todayDisplay');
-        if (todayDisp) {
-            todayDisp.textContent = "今日：" + (today.getFullYear() - 1911) + "年" + (today.getMonth() + 1) + "月" + today.getDate() + "日";
-        }
+    <script>
+        let currentData = [];
 
-        // Try to load from memory
-        const stored = localStorage.getItem('todoData');
-        if (stored) {
-            try {
-                currentData = JSON.parse(stored);
-                renderResults();
-            } catch (e) {
-                console.log("Storage empty or broken");
-            }
-        }
-        
-        // Force hide empty state if data exists
-        document.getElementById('emptyState').style.display = currentData.length > 0 ? 'none' : 'block';
-        if (window.lucide) lucide.createIcons();
-    };
-
-    // 3. The Sync Function (Direct & Simple)
-    async function importFromCloud() {
-        const btn = document.getElementById('cloudSyncBtn');
-        btn.innerText = '同步中...';
-
-        const gistUrl = 'https://gist.githubusercontent.com/kulo2026/6eb3376bcf2fe8f601ab1e59ffd42074/raw/4f3744f0987add6040fb53c4c288d3e62f2f9a5e/todo.json';
-        const proxyUrl = 'https://allorigins.win' + encodeURIComponent(gistUrl + '?t=' + Date.now());
-
-        try {
-            const response = await fetch(proxyUrl);
-            const data = await response.json();
+        // 1. 啟動
+        window.onload = function() {
+            const today = new Date();
+            document.getElementById('todayDisplay').textContent = "今日：" + (today.getFullYear() - 1911) + "年" + (today.getMonth() + 1) + "月" + today.getDate() + "日";
             
-            if (data && data.items) {
-                currentData = data.items;
-                localStorage.setItem('todoData', JSON.stringify(data.items));
-                renderResults();
-                alert('✅ 同步完成！');
+            const stored = localStorage.getItem('todoData');
+            if (stored) {
+                try {
+                    currentData = JSON.parse(stored);
+                    renderResults();
+                } catch (e) { console.error("Data error"); }
             }
-        } catch (err) {
-            console.error(err);
-            alert('❌ 同步失敗，請檢查 Gist 內容');
-        } finally {
-            btn.innerHTML = '<i data-lucide="refresh-cw"></i>同步雲端';
+            if (window.lucide) lucide.createIcons();
+        };
+
+        // 2. 解析資料
+        function parseData() {
+            const input = document.getElementById('dataInput');
+            const lines = input.value.split('\n');
+            lines.forEach(line => {
+                const m = line.match(/^(\d{3,4})(\d{2})(\d{2})\s*(.*)$/);
+                if (m) {
+                    currentData.push({
+                        date: m[1] + "-" + m[2] + "-" + m[3],
+                        task: m[4] || "未命名任務"
+                    });
+                }
+            });
+            input.value = '';
+            saveAndRender();
+        }
+
+        // 3. 雲端同步
+        async function importFromCloud() {
+            const btn = document.getElementById('cloudSyncBtn');
+            btn.textContent = '同步中...';
+            const gistUrl = 'https://gist.githubusercontent.com/kulo2026/6eb3376bcf2fe8f601ab1e59ffd42074/raw/4f3744f0987add6040fb53c4c288d3e62f2f9a5e/todo.json';
+            const finalUrl = 'https://allorigins.win' + encodeURIComponent(gistUrl + '?t=' + Date.now());
+
+            try {
+                const resp = await fetch(finalUrl);
+                const data = await resp.json();
+                if (data.items) {
+                    currentData = data.items;
+                    saveAndRender();
+                    alert('✅ 同步完成');
+                }
+            } catch (e) { alert('❌ 同步失敗'); }
+            finally { btn.textContent = '同步雲端'; }
+        }
+
+        // 4. 渲染畫面
+        function renderResults() {
+            const container = document.getElementById('results');
+            const empty = document.getElementById('emptyState');
+            
+            if (currentData.length === 0) {
+                container.innerHTML = '';
+                empty.style.display = 'block';
+                return;
+            }
+            
+            empty.style.display = 'none';
+            currentData.sort((a, b) => a.date.localeCompare(b.date));
+
+            let html = '';
+            currentData.forEach((item, index) => {
+                html += `
+                <div class="item-card p-4 rounded-xl flex justify-between items-center">
+                    <div>
+                        <div class="text-xs text-green-400 font-mono mb-1">${item.date}</div>
+                        <div class="text-sm">${item.task}</div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="editItem(${index})" class="text-slate-400 p-1"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
+                        <button onclick="deleteItem(${index})" class="text-red-400 p-1"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                    </div>
+                </div>`;
+            });
+            container.innerHTML = html;
             if (window.lucide) lucide.createIcons();
         }
-    }
 
-    // 4. Render results to the screen
-    function renderResults() {
-        const container = document.getElementById('results');
-        if (!container) return;
+        // 5. 功能按鈕
+        function saveAndRender() {
+            localStorage.setItem('todoData', JSON.stringify(currentData));
+            renderResults();
+        }
 
-        // Hide empty state
-        document.getElementById('emptyState').style.display = 'none';
+        function deleteItem(index) {
+            if (confirm('確定刪除？')) {
+                currentData.splice(index, 1);
+                saveAndRender();
+            }
+        }
 
-        // Sort by date string
-        currentData.sort((a, b) => a.date.localeCompare(b.date));
+        function editItem(index) {
+            const newTask = prompt('編輯任務內容：', currentData[index].task);
+            if (newTask) {
+                currentData[index].task = newTask;
+                saveAndRender();
+            }
+        }
 
-        let html = '';
-        currentData.forEach(item => {
-            html += `
-            <div class="mb-2 p-4 rounded-lg border border-slate-700" style="background:#181a22;">
-                <p class="text-xs font-bold text-green-400 mb-1">${item.date}</p>
-                <p class="text-sm text-slate-200">${item.task}</p>
-            </div>`;
-        });
-        container.innerHTML = html;
-    }
-
-    // 5. Basic Actions to prevent errors
-    function clearStorage() { localStorage.clear(); location.reload(); }
-    function downloadData() { alert("請使用『同步雲端』管理資料"); }
-    function parseData() { alert("請先同步雲端載入資料"); }
-    function importData() { alert("請先同步雲端載入資料"); }
-    function openUploadPage() { window.open("https://github.com", '_blank'); }
-  </script>
- <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9edd1d2610b28273',t:'MTc3NjQ0NjU2Ny4wMDAwMDA='};var a=document.createElement('script');a.nonce='';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+        function clearStorage() {
+            if (confirm('確定清除所有資料？')) {
+                localStorage.clear();
+                location.reload();
+            }
+        }
+    </script>
+</body>
 </html>
