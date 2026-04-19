@@ -6,7 +6,7 @@
   <title>日期待辦排序器</title>
   <script src="https://cdn.tailwindcss.com/3.4.17"></script>
   <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
- 
+  <script src="/_sdk/element_sdk.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&amp;display=swap" rel="stylesheet">
   <style>
     * { box-sizing: border-box; }
@@ -20,7 +20,7 @@
     .container-wrapper { max-width: 48rem; margin: 0 auto; padding: 2.5rem 1rem; }
   </style>
   <style>body { box-sizing: border-box; }</style>
-  
+  <script src="/_sdk/data_sdk.js" type="text/javascript"></script>
  </head>
  <body class="h-full w-full">
   <div id="app" class="h-full w-full overflow-auto" style="background: #0f1117;">
@@ -70,469 +70,125 @@
   </div>
   <script>
     const defaultConfig = {
-    page_title: '日期待辦排序器',
-    background_color: '#0f1117',
-    surface_color: '#181a22',
-    text_color: '#e8eaed',
-    accent_color: '#63d297',
-    muted_color: '#7a7f8a',
-    font_family: 'Noto Sans TC',
-    font_size: 16
-};
-
-let currentData = [];
-let baselineSnapshot = {};
-let dateFormatSnapshot = {};
-let originalDateFormatMap = {};
-
-const taiwanHolidays2026 = [
-    '2026-01-01', '2026-01-28', '2026-01-29', '2026-01-30', '2026-02-28',
-    '2026-04-04', '2026-04-05', '2026-06-10', '2026-09-10', '2026-10-10',
-    '2026-12-25'
-];
- // --- 1. Initialization ---  
- window.onload = () => {
-    // 1. Setup today's display
-    const today = new Date();
-    const todayDisp = document.getElementById('todayDisplay');
-    if (todayDisp) {
-        todayDisp.textContent = "今日：" + formatDateString(today.getFullYear(), today.getMonth() + 1, today.getDate(), false);
-    }
-
-    // 2. Setup the import button listener
-    setupImportListener();
-
-    // 3. Load saved data
-    const savedData = loadFromLocalStorage();
-    if (savedData && savedData.length > 0) {
-        currentData = savedData;
-        currentData.sort((a, b) => a.date - b.date);
-        renderResults(currentData, defaultConfig);
-    } else {
-        document.getElementById('emptyState').style.display = 'block';
-    }
-
-    // 4. Render icons
-    if (window.lucide) lucide.createIcons();
-};
-    
- // --- 2. Core Logic (Parsing & Generation) ---
-
-function parseData() {
-    const raw = document.getElementById('dataInput').value;
-    if (!raw.trim()) return;
-    const lines = raw.split('\n');
-    let items = [...currentData];
-    let currentItem = null;
-
-    lines.forEach(line => {
-        const trimmed = line.trim();
-        if (startsWithDate(trimmed)) {
-            if (currentItem) processAndPush(currentItem, items);
-            const parsed = extractDateAndTask(trimmed);
-            if (parsed) {
-                currentItem = parsed;
-                if (!baselineSnapshot[parsed.task]) baselineSnapshot[parsed.task] = parsed.baselineDate;
-            }
-        } else if (trimmed && currentItem) {
-            currentItem.task += '\n' + trimmed;
-        }
-    });
-    if (currentItem) processAndPush(currentItem, items);
-
-    const uniqueItems = [];
-    const seenKeys = new Set();
-    items.forEach(item => {
-        const key = `${item.task.trim()}|${item.dateStr}`;
-        if (!seenKeys.has(key)) { seenKeys.add(key); uniqueItems.push(item); }
-    });
-
-    uniqueItems.sort((a, b) => a.date - b.date);
-    currentData = uniqueItems;
-    saveToLocalStorage();
-    renderResults(currentData, defaultConfig);
-    document.getElementById('dataInput').value = '';
-}
-
-function processAndPush(item, targetArray) {
-    if (item.frequency) targetArray.push(...generateRecurringItems(item));
-    else targetArray.push(item);
-}
-
-function extractDateAndTask(line) {
-    const recur = extractRecurringPattern(line);
-    let year, month, day, task, freq = null, isWestern = true;
-    if (recur) {
-        ({ year, month, day, task, frequency: freq } = recur);
-        isWestern = year >= 1900;
-    } else {
-        const p = [/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})(?:\s+(.+))?$/, /^(\d{3})[\/\-.](\d{1,2})[\/\-.](\d{1,2})(?:\s+(.+))?$/, /^(\d{3})(\d{2})(\d{2})(?:\s+(.+))?$/];
-        let m = line.match(p[0]);
-        if (m) { [year, month, day, task] = [+m[1], +m[2], +m[3], m[4]]; }
-        else if (m = line.match(p[1])) { [year, month, day, task] = [+m[1]+1911, +m[2], +m[3], m[4]]; isWestern = false; }
-        else if (m = line.match(p[2])) { [year, month, day, task] = [+m[1]+1911, +m[2], +m[3], m[4]]; isWestern = false; }
-        else return null;
-    }
-    const dObj = new Date(year, month - 1, day);
-    return isNaN(dObj.getTime()) ? null : { date: dObj, dateStr: `${year}-${month}-${day}`, task: (task || "").trim(), frequency: freq || "" };
-}
-
-function generateRecurringItems(baseItem, overrideBaseline = null) {
-    const items = [];
-    // 優先使用傳入的基準日，或項目的基準日
-    let baselineDateStr = overrideBaseline || baseItem.baselineDate;
-    
-    // 如果都沒有，從 dateStr 抓取
-    if (!baselineDateStr && baseItem.dateStr) {
-        baselineDateStr = baseItem.dateStr;
-    }
-
-    // 防呆：如果還是沒日期，就結束
-    if (!baselineDateStr) return [];
-
-    const [baseYear, baseMonth, baseDay] = baselineDateStr.split('-').map(Number);
-    const baseFrequency = baseItem.frequency || '每周';
-
-    // 輔助函式：建立乾淨的本地日期（時間設為 00:00:00）
-    const createSafeDate = (y, m, d) => {
-        const date = new Date(y, m, d);
-        date.setHours(0, 0, 0, 0);
-        return date;
+      page_title: '日期待辦排序器',
+      background_color: '#0f1117',
+      surface_color: '#181a22',
+      text_color: '#e8eaed',
+      accent_color: '#63d297'
     };
 
-    // 輔助函式：尋找該月第 N 個星期幾
-    const getNthWeekdayOfMonth = (year, month, nth, weekday) => {
-        const firstDay = new Date(year, month, 1);
-        let date = (weekday - firstDay.getDay() + 7) % 7;
-        date += (nth - 1) * 7 + 1;
-        return createSafeDate(year, month, date);
-    };
+    let currentData = [];
 
-    // 輔助函式：推入結果陣列
-    const pushItem = (newDate) => {
-        const y = newDate.getFullYear();
-        const m = newDate.getMonth() + 1;
-        const d = newDate.getDate();
-        items.push({
-            ...baseItem, // 保留原始資料（task, etc.）
-            date: newDate,
-            dateStr: `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`,
-            frequency: baseFrequency,
-            baselineDate: baselineDateStr
-        });
-    };
+    // 1. App Startup
+    window.onload = () => {
+        // Set Today's Date
+        const today = new Date();
+        const y = today.getFullYear();
+        const m = today.getMonth() + 1;
+        const d = today.getDate();
+        document.getElementById('todayDisplay').textContent = `今日：${y-1911}年${m}月${d}日`;
 
-    // --- 頻率邏輯分支 ---
-    if (baseFrequency === '每周') {
-        for (let i = 0; i < 52; i++) pushItem(createSafeDate(baseYear, baseMonth - 1, baseDay + i * 7));
-    } else if (baseFrequency === '每月') {
-        for (let i = 0; i < 12; i++) pushItem(createSafeDate(baseYear, baseMonth - 1 + i, baseDay));
-    } else if (baseFrequency.includes('每月第')) {
-        const nthMap = { '第一個': 1, '第二個': 2, '第三個': 3, '第四個': 4 };
-        const targetWeekday = baseFrequency.endsWith('週六') ? 6 : 0;
-        const nthStr = baseFrequency.replace('每月', '').substring(0, 3);
-        const nthValue = nthMap[nthStr] || 1;
-        for (let i = 0; i < 12; i++) {
-            pushItem(getNthWeekdayOfMonth(baseYear, (baseMonth - 1) + i, nthValue, targetWeekday));
-        }
-    } else if (baseFrequency === '每季') {
-        for (let i = 0; i < 4; i++) pushItem(createSafeDate(baseYear, baseMonth - 1 + i * 3, baseDay));
-    } else if (baseFrequency === '每年') {
-        for (let i = 0; i < 10; i++) pushItem(createSafeDate(baseYear + i, baseMonth - 1, baseDay));
-    }
-
-    return items;
-}
-// --- 3. UI & Rendering ---
-
-function renderResults(items, c) {
-    const container = document.getElementById('results');
-    document.getElementById('emptyState').style.display = items.length ? 'none' : 'block';
-    let html = '';
-    let lastDateStr = '';
-
-    items.forEach((item, i) => {
-        const daysDiff = getDaysDifference(item.date);
-        const dynamicColor = getColorByDaysDifference(daysDiff);
-        const displayDate = formatDateString(item.date.getFullYear(), item.date.getMonth()+1, item.date.getDate(), item.date.getFullYear() > 2000);
-        const isNewDate = displayDate !== lastDateStr;
-        lastDateStr = displayDate;
-        const itemKey = `${item.task.trim()}|${item.dateStr}`;
-
-        html += `
-        <div class="flex gap-4">
-            <div class="flex flex-col items-center pt-1">
-                <div class="timeline-dot" style="background:${isNewDate ? c.accent_color : 'transparent'}; border:2px solid ${c.accent_color};"></div>
-                ${i < items.length - 1 ? `<div class="timeline-line flex-1 mt-1" style="background:${c.accent_color}22;"></div>` : ''}
-            </div>
-            <div class="pb-5 flex-1 min-w-0">
-                <div class="flex items-center justify-between gap-2 mb-1">
-                    <div class="flex items-center gap-2 flex-wrap">
-                        ${isNewDate ? `<p class="mono text-xs font-medium" style="color:${c.accent_color};">${displayDate}</p>` : '<div style="width:70px;"></div>'}
-                        <select class="freq-select px-2 py-0.5 rounded text-xs font-medium" onchange="changeFrequency(this)" data-item-key="${itemKey}" style="background:rgba(99,210,151,0.15); color:#63d297; border:1px solid rgba(99,210,151,0.3);">
-                            <option value="" ${!item.frequency?'selected':''}>無重複</option>
-                            <option value="每周" ${item.frequency==='每周'?'selected':''}>每周</option>
-                            <option value="每月" ${item.frequency==='每月'?'selected':''}>每月</option>
-                        </select>
-                    </div>
-                    <div class="flex gap-1">
-                        <button class="p-1.5" onclick="editItem(\`${itemKey}\`)" style="color:${c.accent_color};"><i data-lucide="book-open" style="width:14px;height:14px;"></i></button>
-                        <button class="p-1.5" onclick="deleteItem(\`${itemKey}\`)" style="color:#f87171;"><i data-lucide="trash-2" style="width:14px;height:14px;"></i></button>
-                    </div>
-                </div>
-                <div class="rounded-lg px-4 py-3" style="background:${c.surface_color}; border:1px solid ${daysDiff <= 3 ? dynamicColor : '#2a2d37'};">
-                    <p class="text-sm" style="white-space: pre-wrap; color:${dynamicColor};">${item.task}</p>
-                </div>
-            </div>
-        </div>`;
-    });
-    container.innerHTML = html;
-    if (window.lucide) lucide.createIcons();
-}   
-
-// 1. Unified Today Display (Supports English Weekdays)
-function updateTodayDisplay() {
-    const today = new Date();
-    const todayText = formatDateString(today.getFullYear(), today.getMonth() + 1, today.getDate(), false);
-    const displayElement = document.getElementById('todayDisplay');
-    if (displayElement) displayElement.textContent = "今日：" + todayText;
-}
-
-// 2. Workday Difference Logic
-function getDaysDifference(targetDate) {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const target = new Date(targetDate);
-    target.setHours(0, 0, 0, 0);
-    const formatDate = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    
-    if (target.getTime() === today.getTime()) return 0;
-
-    let workDays = 0;
-    const step = target > today ? 1 : -1;
-    let current = new Date(today);
-
-    while (current.getTime() !== target.getTime()) {
-        current.setDate(current.getDate() + step);
-        const dateStr = formatDate(current);
-        const isHoliday = (typeof taiwanHolidays2026 !== 'undefined') ? taiwanHolidays2026.includes(dateStr) : false;
-        const isWeekend = current.getDay() === 0 || current.getDay() === 6;
-        if (!isHoliday && !isWeekend) workDays += step;
-    }
-    return workDays;
-}
-
-// 3. Date Formatting (The Sun, Mon, Tue... Version)
-function formatDateString(year, month, day, isWesternYear) {
-    const weekdaysTW = ['日', '一', '二', '三', '四', '五', '六'];
-    const weekdaysEN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const date = new Date(year, month - 1, day);
-    const idx = date.getDay();
-    const yStr = isWesternYear ? year : year - 1911;
-    return `${yStr} 年 ${month} 月 ${day} 日 (${weekdaysEN[idx]}/週${weekdaysTW[idx]})`;
-}
-
-
-// 5. Urgency Color Logic
-function getColorByDaysDifference(daysDiff) {
-    if (daysDiff === 1) return '#f87171'; // Red
-    if (daysDiff === 2) return '#facc15'; // Yellow
-    if (daysDiff === 3) return '#60a5fa'; // Blue
-    return '#e8eaed'; // Default
-}
-// --- 4. Cloud & Sync ---
-
-async function importFromCloud() {
-    const btn = document.getElementById('cloudSyncBtn');
-    btn.innerHTML = '🔄 同步中...';
-    const gistUrl = 'https://githubusercontent.com';
-    const finalUrl = 'https://allorigins.win' + encodeURIComponent(gistRawUrl + '?t=' + Date.now());
-
-    try {
-        const response = await fetch(finalUrl);
-        const data = await response.json();
-        if (data && data.items) {
-            baselineSnapshot = data.baselineSnapshot || {};
-            currentData = data.items.map(item => ({ ...item, date: new Date(item.date) }));
-            saveToLocalStorage();
-            renderResults(currentData, defaultConfig);
-            alert('✅ 同步完成！');
-        }
-    } catch (err) { alert('❌ 同步失敗'); }
-    finally { btn.innerHTML = '<i data-lucide="refresh-cw"></i>同步雲端'; if (window.lucide) lucide.createIcons(); }
-}
-
-
- 
-
-
-// --- 5. Support Functions ---
-
-function saveToLocalStorage() {
-    const storageData = currentData.map(item => ({...item, date: `${item.date.getFullYear()}-${item.date.getMonth()+1}-${item.date.getDate()}`}));
-    localStorage.setItem('todoData', JSON.stringify(storageData));
-    localStorage.setItem('baselineSnapshot', JSON.stringify(baselineSnapshot));
-}
-
-function loadFromLocalStorage() {
-    const stored = localStorage.getItem('todoData');
-    if (!stored) return [];
-    try {
-        const parsed = JSON.parse(stored);
-        baselineSnapshot = JSON.parse(localStorage.getItem('baselineSnapshot') || '{}');
-        let allItems = [];
-        let seen = new Set();
-        parsed.forEach(item => {
-            if (item.frequency && !seen.has(item.task)) {
-                seen.add(item.task);
-                allItems.push(...generateRecurringItems(item));
-            } else if (!item.frequency) {
-                const [y, m, d] = item.date.split('-').map(Number);
-                allItems.push({...item, date: new Date(y, m-1, d)});
-            }
-        });
-        return allItems;
-    } catch (e) { return []; }
-}
-
-function downloadData() {
-    const exportObj = { items: currentData, baselineSnapshot, dateFormatSnapshot };
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportObj, null, 2));
-    const dl = document.createElement('a');
-    dl.href = dataStr;
-    dl.download = `待辦事項_${new Date().toISOString().split('T')[0]}.json`;
-    dl.click();
-}
-
-
-function clearAll() { document.getElementById('dataInput').value = ''; }
-function clearStorage() { if(confirm('確定清除？')){ localStorage.clear(); location.reload(); } }
-function openUploadPage() { window.open("https://e.pcloud.com/#/puplink?code=1xK7ZmSE96xqEgNjaDRqV6zOp4mvdwpuV", '_blank'); }
-
-function startsWithDate(l) { return [/^\d{4}/, /^\d{3}/].some(p => p.test(l.trim())); }
-function extractRecurringPattern(l) {
-    const m = l.match(/^(\d{3,4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})\(([^)]+)\)\s*(.*)$/);
-    if (!m) return null;
-    const y = m[1].length === 3 ? +m[1]+1911 : +m[1];
-    return { year: y, month: +m[2], day: +m[3], frequency: m[4].trim(), task: m[5].trim() };
-}
-
-function setupImportListener() {
-    document.getElementById('importFile')?.addEventListener('change', function(e) {
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            const data = JSON.parse(event.target.result);
-            currentData = (data.items || data).map(i => ({...i, date: new Date(i.date)}));
-            saveToLocalStorage();
-            renderResults(currentData, defaultConfig);
-            alert('✅ 匯入成功');
-        };
-        reader.readAsText(e.target.files[0]);
-    });
-}
-
-function editItem(itemKey) {
-    const idx = currentData.findIndex(i => `${i.task.trim()}|${i.dateStr}` === itemKey);
-    if (idx === -1) return;
-    const newTxt = prompt("編輯任務內容：", currentData[idx].task);
-    if (newTxt !== null && newTxt.trim() !== "") {
-        currentData[idx].task = newTxt.trim();
-        saveToLocalStorage();
-        renderResults(currentData, defaultConfig);
-    }
-}
-
-    // deleteItem(itemKey)有改過2次
-    
-    function deleteItem(itemKey) {
-    if (!confirm('確定要刪除此項目嗎？')) return;
-    currentData = currentData.filter(item => `${item.task.trim()}|${item.dateStr}` !== itemKey);
-    saveToLocalStorage();
-    renderResults(currentData, defaultConfig);
-}
- 
-    function escapeHtml(t) {
-    const d = document.createElement('div');
-    d.textContent = t;
-    return d.innerHTML;
-}
-
-    
-    
-// changeFrequency有改過3次
-    function changeFrequency(select) {
-    const itemKey = select.getAttribute('data-item-key');
-    const newFreq = select.value;
-    // itemKey uses "Task Name|YYYY-MM-DD"
-    const idx = currentData.findIndex(i => `${i.task.trim()}|${i.dateStr}` === itemKey);
-    if (idx !== -1) {
-        currentData[idx].frequency = newFreq;
-        saveToLocalStorage();
-        // Reload to trigger the generateRecurringItems logic
-        currentData = loadFromLocalStorage();
-        currentData.sort((a,b) => a.date - b.date);
-        renderResults(currentData, defaultConfig);
-    }
-}
-
-
-//doClearStorage有改過
-function doClearStorage() {
-    if(!confirm("確定要清除所有儲存的資料嗎？此操作無法復原。")) return;
-    try {
-        localStorage.clear();
-        currentData = [];
-        baselineSnapshot = {};
-        document.getElementById('results').innerHTML = '';
-        document.getElementById('emptyState').style.display = 'block';
-        document.getElementById('dataInput').value = '';
-        setTimeout(() => alert('✓ 已成功清除所有資料'), 100);
-    } catch (e) {
-        location.reload(); 
-    }
-}
- 
-
-    // 設定檔案輸入監聽setupImportListener有改過4次
-    const setupImportListener = () => {
-    const importFile = document.getElementById('importFile');
-    if (!importFile) return;
-    
-    importFile.addEventListener('change', function(e) {
-        const file = e.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = function(event) {
+        // Load Data
+        const stored = localStorage.getItem('todoData');
+        if (stored) {
             try {
-                const imported = JSON.parse(event.target.result);
-                // Handle both Package and Simple List formats
-                const rawItems = imported.items || imported;
-                if (!Array.isArray(rawItems)) throw new Error('格式錯誤');
-
-                const parsedData = rawItems.map(item => {
-                    const dObj = new Date(item.date);
-                    return {
-                        ...item,
-                        date: dObj,
-                        dateStr: item.dateStr || `${dObj.getFullYear()}-${dObj.getMonth()+1}-${dObj.getDate()}`
-                    };
-                });
-
-                currentData = parsedData;
-                saveToLocalStorage();
-                renderResults(currentData, defaultConfig);
-                alert(`✓ 匯入成功！共 ${parsedData.length} 筆`);
-            } catch (err) {
-                alert(`✗ 檔案讀取失敗`);
-            } finally {
-                importFile.value = '';
+                const parsed = JSON.parse(stored);
+                currentData = parsed.map(item => ({
+                    ...item,
+                    date: new Date(item.date)
+                }));
+                renderResults(currentData);
+            } catch (e) {
+                console.error("Load failed", e);
+                document.getElementById('emptyState').style.display = 'block';
             }
-        };
-        reader.readAsText(file);
-    });
-};
+        } else {
+            document.getElementById('emptyState').style.display = 'block';
+        }
+        if (window.lucide) lucide.createIcons();
+    };
 
-    
+    // 2. Cloud Sync (Your primary request)
+    async function importFromCloud() {
+        const btn = document.getElementById('cloudSyncBtn');
+        btn.innerHTML = '🔄 同步中...';
+        
+        // Permanent Raw Link
+        const gistUrl = 'https://gist.githubusercontent.com/kulo2026/6eb3376bcf2fe8f601ab1e59ffd42074/raw/4f3744f0987add6040fb53c4c288d3e62f2f9a5e/todo.json';
+        const proxy = 'https://allorigins.win' + encodeURIComponent(gistUrl + '?t=' + Date.now());
+
+        try {
+            const response = await fetch(proxy);
+            const data = await response.json();
+            
+            if (data.items) {
+                currentData = data.items.map(item => ({
+                    ...item,
+                    date: new Date(item.date)
+                }));
+                
+                // Save to browser memory
+                localStorage.setItem('todoData', JSON.stringify(data.items));
+                renderResults(currentData);
+                alert('✅ 雲端同步完成！');
+            }
+        } catch (err) {
+            alert('❌ 同步失敗，請檢查網路。');
+        } finally {
+            btn.innerHTML = '<i data-lucide="refresh-cw"></i>同步雲端';
+            if (window.lucide) lucide.createIcons();
+        }
+    }
+
+    // 3. Render Logic
+    function renderResults(items) {
+        const container = document.getElementById('results');
+        const empty = document.getElementById('emptyState');
+        
+        if (!items || items.length === 0) {
+            empty.style.display = 'block';
+            container.innerHTML = '';
+            return;
+        }
+        
+        empty.style.display = 'none';
+        items.sort((a, b) => a.date - b.date);
+
+        let html = '';
+        items.forEach(item => {
+            const d = item.date;
+            const dateStr = `${d.getFullYear()-1911}/${d.getMonth()+1}/${d.getDate()}`;
+            
+            html += `
+            <div class="mb-2 p-4 rounded-lg" style="background:#181a22; border:1px solid #2a2d37;">
+                <p class="text-xs font-bold mb-1" style="color:#63d297;">${dateStr}</p>
+                <p class="text-sm text-slate-200">${item.task}</p>
+            </div>`;
+        });
+        container.innerHTML = html;
+    }
+
+    // 4. Basic Actions
+    function clearStorage() {
+        if(confirm('確定清除全部資料？')) {
+            localStorage.clear();
+            location.reload();
+        }
+    }
+
+    function downloadData() {
+        const blob = new Blob([localStorage.getItem('todoData')], {type: 'application/json'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'backup.json';
+        a.click();
+    }
+
+    // Functions that are currently disabled in this simple version but keep the buttons from crashing
+    function parseData() { alert("此版本已簡化，請使用『同步雲端』載入 Gist 資料。"); }
+    function importData() { alert("此版本暫不支援本地檔案匯入。"); }
+    function openUploadPage() { window.open("https://github.com", '_blank'); }
   </script>
- <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9edd1d2610b28273',t:'MTc3NjQ0NjU2Ny4wMDAwMDA='};var a=document.createElement('script');a.nonce='';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9edd1d2610b28273',t:'MTc3NjQ0NjU2Ny4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
