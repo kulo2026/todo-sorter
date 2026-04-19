@@ -68,25 +68,39 @@
         }
 
         // --- 核心同步邏輯 (The working Proxy Version) ---
-        async function importFromCloud() {
+       async function importFromCloud() {
     const btn = document.getElementById('cloudSyncBtn');
-    const gistUrl = 'https://gist.githubusercontent.com/kulo2026/6eb3376bcf2fe8f601ab1e59ffd42074/raw/4f3744f0987add6040fb53c4c288d3e62f2f9a5e/todo.json';
     
-    btn.textContent = "⌛ 下載中...";
+    // 1. Direct RAW link (GitHub Pages trusts GitHub Gist)
+    const gistUrl = 'https://gist.githubusercontent.com/kulo2026/6eb3376bcf2fe8f601ab1e59ffd42074/raw/4f3744f0987add6040fb53c4c288d3e62f2f9a5e/todo.json
+';
+
+    btn.textContent = "⌛ 同步中...";
+    
     try {
+        // 2. Fetch directly with a timestamp to prevent old data
         const response = await fetch(gistUrl + '?t=' + Date.now());
+        
+        if (!response.ok) throw new Error('無法存取 Gist (Status: ' + response.status + ')');
+        
         const data = await response.json();
         
-        if (data.items) {
-            currentData = data.items.map(i => ({...i, date: new Date(i.date)}));
-            saveLocal(); // Automatically update browser memory too
+        if (data && data.items) {
+            // 3. Process and convert dates
+            currentData = data.items.map(i => ({
+                ...i, 
+                date: new Date(i.date)
+            }));
+            
+            saveLocal();
             render();
-            alert("✅ 雲端資料下載成功！");
+            alert("✅ 雲端同步完成");
         }
     } catch (e) { 
-        alert("❌ 下載失敗，請檢查網路。"); 
+        console.error("Sync Error:", e);
+        alert("❌ 同步失敗：連線被拒絕。請確認 Gist 是否為公開(Public)或 Secret，且連結正確。"); 
     } finally { 
-        btn.textContent = "☁️ 雲端下載"; 
+        btn.textContent = "🔄 同步雲端"; 
     }
 }
 
